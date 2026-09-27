@@ -9,3 +9,5 @@ dist
 coverage
 .vitest/
 .claude/
+.env*
+!.env.example
