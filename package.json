@@ -1,0 +1,36 @@
+{
+  "name": "tracker-cloudefined",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:atlas": "vite --mode atlas",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "npm run typecheck:app && npm run typecheck:server",
+    "typecheck:app": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
+    "test": "vitest run",
+    "mongo:local": "bash scripts/local-mongo.sh",
+    "seed:local": "node scripts/seed-local.ts"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.10.0",
+    "mongodb": "7.6.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "7946.0.16",
+    "@types/node": "24.13.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}
