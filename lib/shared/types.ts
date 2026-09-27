@@ -54,11 +54,14 @@ export interface ApiError {
 
 export type AntitheftMode = 'armed' | 'disarmed'
 
+export type ArmReason = 'airplane' | 'charger'
+
 export interface DeviceMode {
   device: string
   mode: AntitheftMode
   since: string | null // ISO changed_at
   lastCheckedAt: string | null // ISO last_checked_at
+  changedBy: 'web' | ArmReason | null
 }
 
 export interface ModesResponse {
@@ -69,4 +72,23 @@ export interface PhoneModeResponse {
   device: string
   mode: AntitheftMode
   since: string | null
+}
+
+export interface PhotoMeta {
+  id: string
+  device: string
+  camera: 'front' | 'back'
+  trigger: string
+  t: string // ISO ts
+  lat: number | null
+  lon: number | null
+  width: number
+  height: number
+}
+
+export interface PhotosResponse {
+  from: string
+  to: string
+  photos: PhotoMeta[]
+  truncated: boolean
 }

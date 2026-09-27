@@ -4,17 +4,20 @@ import { useLatest } from '../hooks/useLatest.js'
 import { useModes } from '../hooks/useModes.js'
 import { useSessions } from '../hooks/useSessions.js'
 import { usePoints, type PointsSelection } from '../hooks/usePoints.js'
+import { usePhotos } from '../hooks/usePhotos.js'
 import { usePlayback } from '../hooks/usePlayback.js'
 import { usePlaybackKeys } from '../hooks/usePlaybackKeys.js'
 import { useIsCompact } from '../hooks/useMediaQuery.js'
 import type { ThemeState } from '../hooks/useTheme.js'
 import { rangeForPreset, type Range } from '../lib/range.js'
 import { POINTS_MAX_SPAN_MS } from '../../lib/shared/rangeLimits.js'
+import { groupPhotos, type PhotoGroup } from '../lib/photoGroups.js'
 import { MapView, type MapViewHandle } from './Map/MapView.js'
 import { Panel } from './Panel/Panel.js'
 import { ALL_POINTS_ID } from './Panel/SessionsList.js'
 import { PlaybackBar } from './Playback/PlaybackBar.js'
 import { PointsTable } from './PointsTable.js'
+import { PhotoViewer } from './PhotoViewer.js'
 
 interface TrackerProps {
   theme: ThemeState
@@ -58,8 +61,10 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [fitToken, setFitToken] = useState(0)
   const [tableOpen, setTableOpen] = useState(false)
+  const [viewerPhoto, setViewerPhoto] = useState<PhotoGroup | null>(null)
   const mapHandleRef = useRef<MapViewHandle | null>(null)
   const tableTriggerRef = useRef<HTMLButtonElement>(null)
+  const photoTriggerRef = useRef<HTMLElement | null>(null)
   const autoSelectedRef = useRef(false)
   const isAutoRefreshRef = useRef(false)
 
@@ -79,6 +84,9 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
     error: sessionsError,
     reload: reloadSessions,
   } = useSessions(range.from, range.to, onUnauthorized)
+
+  const { photos } = usePhotos(range.from, range.to, range.preset !== 'custom', onUnauthorized)
+  const photoGroups = useMemo(() => groupPhotos(photos), [photos])
 
   useEffect(() => {
     // Skip the reset for periodic auto-refresh ticks (same preset, fresher `to`),
@@ -162,6 +170,11 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
   const handleExpandRange = useCallback(() => setRange(rangeForPreset('30d')), [])
   const handleOpenTable = useCallback(() => setTableOpen(true), [])
   const handleCloseTable = useCallback(() => setTableOpen(false), [])
+  const handlePhotoClick = useCallback((photo: PhotoGroup) => {
+    photoTriggerRef.current = document.activeElement as HTMLElement | null
+    setViewerPhoto(photo)
+  }, [])
+  const handleClosePhotoViewer = useCallback(() => setViewerPhoto(null), [])
 
   const cursorIso = useMemo(() => new Date(playback.cursorMs).toISOString(), [playback.cursorMs])
 
@@ -180,6 +193,8 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
         fitBbox={selectedSession?.bbox ?? null}
         fitPadding={fitPadding}
         fitToken={fitToken}
+        photos={photoGroups}
+        onPhotoClick={handlePhotoClick}
         onMapReady={(handle) => {
           mapHandleRef.current = handle
         }}
@@ -224,6 +239,8 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
         onClose={handleCloseTable}
         triggerRef={tableTriggerRef}
       />
+
+      <PhotoViewer photo={viewerPhoto} onClose={handleClosePhotoViewer} triggerRef={photoTriggerRef} />
 
       {pointsTruncated && (
         <div className="points-truncated-toast">Showing the latest 20,000 points; older points omitted.</div>

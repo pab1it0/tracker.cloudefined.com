@@ -29,3 +29,7 @@ export function getRoutesView(env: Env): Collection<Document> {
 export function getModesCollection(env: Env): Collection<Document> {
   return getClient(env).db(env.mongodbDb).collection(env.mongodbModesCollection)
 }
+
+export function getPhotosCollection(env: Env): Collection<Document> {
+  return getClient(env).db(env.mongodbDb).collection(env.mongodbPhotosCollection)
+}
