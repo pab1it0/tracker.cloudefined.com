@@ -84,6 +84,7 @@ export function Panel(props: PanelProps) {
         pendingDevices={modePendingDevices}
         actionErrors={modeActionErrors}
         onToggle={onToggleMode}
+        primaryDevice={device?.device ?? null}
       />
       <RangeControl range={range} onChange={onRangeChange} />
       <div className="panel-sessions-header">

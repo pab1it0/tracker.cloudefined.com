@@ -235,6 +235,12 @@
   letter-spacing: 0.04em;
 }
 
+.mode-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .mode-card-empty {
   margin: 0;
   color: var(--muted);

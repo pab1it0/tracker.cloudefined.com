@@ -12,9 +12,18 @@ interface ModeCardProps {
   pendingDevices: Set<string>
   actionErrors: Record<string, string>
   onToggle: (device: string, mode: AntitheftMode) => void
+  primaryDevice?: string | null
 }
 
-export function ModeCard({ devices, loading, error, pendingDevices, actionErrors, onToggle }: ModeCardProps) {
+export function ModeCard({
+  devices,
+  loading,
+  error,
+  pendingDevices,
+  actionErrors,
+  onToggle,
+  primaryDevice,
+}: ModeCardProps) {
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -40,6 +49,33 @@ export function ModeCard({ devices, loading, error, pendingDevices, actionErrors
     )
   }
 
+  const soloMatch = devices.length === 1 && devices[0].device === primaryDevice
+  const soloDevice = soloMatch ? devices[0] : null
+
+  if (soloDevice) {
+    return (
+      <div className="mode-card">
+        <div className="mode-card-top">
+          <h2>Anti-theft</h2>
+          <span className={`status-pill ${soloDevice.mode === 'armed' ? 'status-pill--danger' : 'status-pill--idle'}`}>
+            {soloDevice.mode === 'armed' ? 'Armed' : 'Disarmed'}
+          </span>
+        </div>
+        {error && <p className="mode-card-empty">Could not load anti-theft mode</p>}
+        <div className="mode-rows">
+          <ModeRow
+            key={soloDevice.device}
+            device={soloDevice}
+            pending={pendingDevices.has(soloDevice.device)}
+            error={actionErrors[soloDevice.device] ?? null}
+            onToggle={onToggle}
+            showName={false}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mode-card">
       <h2>Anti-theft</h2>
@@ -52,6 +88,7 @@ export function ModeCard({ devices, loading, error, pendingDevices, actionErrors
             pending={pendingDevices.has(d.device)}
             error={actionErrors[d.device] ?? null}
             onToggle={onToggle}
+            showName
           />
         ))}
       </div>
@@ -64,9 +101,10 @@ interface ModeRowProps {
   pending: boolean
   error: string | null
   onToggle: (device: string, mode: AntitheftMode) => void
+  showName: boolean
 }
 
-function ModeRow({ device, pending, error, onToggle }: ModeRowProps) {
+function ModeRow({ device, pending, error, onToggle, showName }: ModeRowProps) {
   const [confirming, setConfirming] = useState(false)
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -101,12 +139,14 @@ function ModeRow({ device, pending, error, onToggle }: ModeRowProps) {
 
   return (
     <div className="mode-row">
-      <div className="mode-row-top">
-        <span className="mode-device">{device.device}</span>
-        <span className={`status-pill ${armed ? 'status-pill--danger' : 'status-pill--idle'}`}>
-          {armed ? 'Armed' : 'Disarmed'}
-        </span>
-      </div>
+      {showName && (
+        <div className="mode-row-top">
+          <span className="mode-device">{device.device}</span>
+          <span className={`status-pill ${armed ? 'status-pill--danger' : 'status-pill--idle'}`}>
+            {armed ? 'Armed' : 'Disarmed'}
+          </span>
+        </div>
+      )}
       <p className="mode-row-meta" aria-live="polite">
         <span title={device.since ? formatAbsolute(device.since) : undefined}>{sinceLabel}</span>
         {' · '}
