@@ -13,8 +13,10 @@ const SERVER_ENV_KEYS = [
   'MONGODB_DB',
   'MONGODB_COLLECTION',
   'MONGODB_ROUTES_VIEW',
+  'MONGODB_MODES_COLLECTION',
   'TRACKER_PASSWORD',
   'SESSION_SECRET',
+  'ANTITHEFT_TOKEN',
 ] as const
 
 function readBody(req: IncomingMessage): Promise<Buffer | undefined> {

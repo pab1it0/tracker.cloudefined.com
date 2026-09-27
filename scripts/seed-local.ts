@@ -1,7 +1,8 @@
 // Self-contained local dev seeder: (re)creates the antitheft_locations collection
-// (validator + indexes), the antitheft_routes view, the least-privilege role/user,
-// and synthetic route data for device "Demo iPhone". Reads/writes .env.local itself.
-// Runnable directly by Node's built-in TypeScript type stripping: erasable syntax only.
+// (validator + indexes), the antitheft_routes view, the antitheft_modes collection,
+// the least-privilege roles/user, and synthetic route data for device "Demo iPhone".
+// Reads/writes .env.local itself. Runnable directly by Node's built-in TypeScript
+// type stripping: erasable syntax only.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { randomBytes, randomInt } from 'node:crypto'
@@ -12,6 +13,8 @@ const DB_NAME = 'n8n'
 const COLLECTION_NAME = 'antitheft_locations'
 const VIEW_NAME = 'antitheft_routes'
 const ROLE_NAME = 'antitheftReader'
+const MODES_COLLECTION_NAME = 'antitheft_modes'
+const MODES_ROLE_NAME = 'antitheftModeWriter'
 const APP_USER = 'antitheft_webapp'
 const DEVICE = 'Demo iPhone'
 
@@ -351,6 +354,23 @@ async function main(): Promise<void> {
       ],
     })
 
+    console.log(`Recreating collection ${DB_NAME}.${MODES_COLLECTION_NAME}...`)
+    const modesCollections = await db.listCollections({ name: MODES_COLLECTION_NAME }).toArray()
+    if (modesCollections.length > 0) await db.dropCollection(MODES_COLLECTION_NAME)
+    await db.createCollection(MODES_COLLECTION_NAME)
+    const modesCol = db.collection<{
+      _id: string
+      device: string
+      mode: string
+      changed_at: Date | null
+      last_checked_at: Date | null
+    }>(MODES_COLLECTION_NAME)
+    await modesCol.updateOne(
+      { _id: DEVICE },
+      { $set: { device: DEVICE, mode: 'armed', changed_at: new Date(), last_checked_at: null } },
+      { upsert: true },
+    )
+
     console.log(`Recreating role ${ROLE_NAME} and user ${APP_USER}...`)
     try {
       await adminDb.command({ dropUser: APP_USER })
@@ -362,6 +382,11 @@ async function main(): Promise<void> {
     } catch {
       // role did not exist yet
     }
+    try {
+      await adminDb.command({ dropRole: MODES_ROLE_NAME })
+    } catch {
+      // role did not exist yet
+    }
     await adminDb.command({
       createRole: ROLE_NAME,
       privileges: [
@@ -370,15 +395,26 @@ async function main(): Promise<void> {
       ],
       roles: [],
     })
+    await adminDb.command({
+      createRole: MODES_ROLE_NAME,
+      privileges: [
+        { resource: { db: DB_NAME, collection: MODES_COLLECTION_NAME }, actions: ['find', 'insert', 'update'] },
+      ],
+      roles: [],
+    })
     const appPassword = randomBytes(18).toString('base64url')
     await adminDb.command({
       createUser: APP_USER,
       pwd: appPassword,
-      roles: [{ role: ROLE_NAME, db: 'admin' }],
+      roles: [
+        { role: ROLE_NAME, db: 'admin' },
+        { role: MODES_ROLE_NAME, db: 'admin' },
+      ],
     })
 
     const trackerPassword = env.TRACKER_PASSWORD ?? randomBytes(9).toString('base64url').slice(0, 12)
     const sessionSecret = env.SESSION_SECRET ?? randomBytes(32).toString('hex')
+    const antitheftToken = env.ANTITHEFT_TOKEN ?? randomBytes(32).toString('hex')
 
     upsertEnvKeys(
       ENV_PATH,
@@ -387,10 +423,12 @@ async function main(): Promise<void> {
         MONGODB_DB: DB_NAME,
         MONGODB_COLLECTION: COLLECTION_NAME,
         MONGODB_ROUTES_VIEW: VIEW_NAME,
+        MONGODB_MODES_COLLECTION: MODES_COLLECTION_NAME,
         TRACKER_PASSWORD: trackerPassword,
         SESSION_SECRET: sessionSecret,
+        ANTITHEFT_TOKEN: antitheftToken,
       },
-      ['TRACKER_PASSWORD', 'SESSION_SECRET'],
+      ['TRACKER_PASSWORD', 'SESSION_SECRET', 'ANTITHEFT_TOKEN'],
     )
 
     console.log('Generating synthetic routes for device "Demo iPhone"...')

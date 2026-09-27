@@ -1,6 +1,9 @@
 import type {
+  AntitheftMode,
   ApiError,
+  DeviceMode,
   LatestResponse,
+  ModesResponse,
   PointsResponse,
   SessionsResponse,
 } from '../../lib/shared/types.js'
@@ -83,4 +86,21 @@ export function getPoints(
     Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
   )
   return request(`/api/points?${search}`, { signal })
+}
+
+export function getModes(signal?: AbortSignal): Promise<ModesResponse> {
+  return request('/api/modes', { signal })
+}
+
+export function setMode(
+  device: string,
+  mode: AntitheftMode,
+  signal?: AbortSignal,
+): Promise<DeviceMode> {
+  return request('/api/modes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device, mode }),
+    signal,
+  })
 }

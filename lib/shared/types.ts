@@ -51,3 +51,22 @@ export interface PointsResponse {
 export interface ApiError {
   error: string
 }
+
+export type AntitheftMode = 'armed' | 'disarmed'
+
+export interface DeviceMode {
+  device: string
+  mode: AntitheftMode
+  since: string | null // ISO changed_at
+  lastCheckedAt: string | null // ISO last_checked_at
+}
+
+export interface ModesResponse {
+  devices: DeviceMode[]
+}
+
+export interface PhoneModeResponse {
+  device: string
+  mode: AntitheftMode
+  since: string | null
+}

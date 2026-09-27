@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
-import type { LatestPoint, SessionSummary } from '../../../lib/shared/types.js'
+import type { AntitheftMode, DeviceMode, LatestPoint, SessionSummary } from '../../../lib/shared/types.js'
 import type { Range } from '../../lib/range.js'
 import type { ThemeState } from '../../hooks/useTheme.js'
 import { Mark } from '../Mark.js'
 import { LogoutIcon, MoonIcon, SunIcon, SystemIcon, TableIcon, ChevronIcon } from '../icons.js'
 import { StatusCard } from './StatusCard.js'
+import { ModeCard } from './ModeCard.js'
 import { RangeControl } from './RangeControl.js'
 import { SessionsList } from './SessionsList.js'
 
@@ -29,6 +30,12 @@ interface PanelProps {
   tableTriggerRef: React.RefObject<HTMLButtonElement | null>
   isCompact: boolean
   selectedSummaryLabel: string | null
+  modeDevices: DeviceMode[]
+  modesLoading: boolean
+  modesError: string | null
+  modePendingDevices: Set<string>
+  modeActionErrors: Record<string, string>
+  onToggleMode: (device: string, mode: AntitheftMode) => void
 }
 
 const THEME_ICON = { system: SystemIcon, light: SunIcon, dark: MoonIcon }
@@ -56,6 +63,12 @@ export function Panel(props: PanelProps) {
     tableTriggerRef,
     isCompact,
     selectedSummaryLabel,
+    modeDevices,
+    modesLoading,
+    modesError,
+    modePendingDevices,
+    modeActionErrors,
+    onToggleMode,
   } = props
 
   const [sheetExpanded, setSheetExpanded] = useState(false)
@@ -64,6 +77,14 @@ export function Panel(props: PanelProps) {
   const body = (
     <>
       <StatusCard device={device} loading={statusLoading} error={statusError} onCenter={onCenter} />
+      <ModeCard
+        devices={modeDevices}
+        loading={modesLoading}
+        error={modesError}
+        pendingDevices={modePendingDevices}
+        actionErrors={modeActionErrors}
+        onToggle={onToggleMode}
+      />
       <RangeControl range={range} onChange={onRangeChange} />
       <div className="panel-sessions-header">
         <h2>Sessions</h2>

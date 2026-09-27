@@ -10,6 +10,7 @@
   --accent-ink: #ffffff;
   --good: #0ca30c;
   --critical: #d03b3b;
+  --danger: #d03b3b;
   --route-old: #86b6ef;
   --route-new: #104281;
 
@@ -41,6 +42,7 @@
     --hairline: #2c2c2a;
     --baseline: #383835;
     --accent: #3987e5;
+    --danger: #e0554f;
     --route-old: #256abf;
     --route-new: #9ec5f4;
     color-scheme: dark;
@@ -56,6 +58,7 @@
   --hairline: #2c2c2a;
   --baseline: #383835;
   --accent: #3987e5;
+  --danger: #e0554f;
   --route-old: #256abf;
   --route-new: #9ec5f4;
   color-scheme: dark;

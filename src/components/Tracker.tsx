@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SessionSummary } from '../../lib/shared/types.js'
 import { useLatest } from '../hooks/useLatest.js'
+import { useModes } from '../hooks/useModes.js'
 import { useSessions } from '../hooks/useSessions.js'
 import { usePoints, type PointsSelection } from '../hooks/usePoints.js'
 import { usePlayback } from '../hooks/usePlayback.js'
@@ -63,6 +64,14 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
   const isAutoRefreshRef = useRef(false)
 
   const { devices, loading: statusLoading, error: statusError } = useLatest(onUnauthorized)
+  const {
+    devices: modeDevices,
+    loading: modesLoading,
+    error: modesError,
+    pendingDevices: modePendingDevices,
+    actionErrors: modeActionErrors,
+    toggle: toggleMode,
+  } = useModes(onUnauthorized)
   const {
     sessions,
     truncated: sessionsTruncated,
@@ -197,6 +206,12 @@ export function Tracker({ theme, onLogout, onUnauthorized }: TrackerProps) {
         tableTriggerRef={tableTriggerRef}
         isCompact={isCompact}
         selectedSummaryLabel={selectedSummaryLabel}
+        modeDevices={modeDevices}
+        modesLoading={modesLoading}
+        modesError={modesError}
+        modePendingDevices={modePendingDevices}
+        modeActionErrors={modeActionErrors}
+        onToggleMode={toggleMode}
       />
 
       {!pointsLoading && points.length > 1 && (

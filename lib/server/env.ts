@@ -10,6 +10,7 @@ export interface Env {
   mongodbDb: string
   mongodbCollection: string
   mongodbRoutesView: string
+  mongodbModesCollection: string
   trackerPassword: string
   sessionSecret: string
 }
@@ -34,7 +35,20 @@ export function readEnv(): Env {
     mongodbDb: process.env.MONGODB_DB?.trim() || 'n8n',
     mongodbCollection: process.env.MONGODB_COLLECTION?.trim() || 'antitheft_locations',
     mongodbRoutesView: process.env.MONGODB_ROUTES_VIEW?.trim() || 'antitheft_routes',
+    mongodbModesCollection: process.env.MONGODB_MODES_COLLECTION?.trim() || 'antitheft_modes',
     trackerPassword: required('TRACKER_PASSWORD'),
     sessionSecret,
   }
+}
+
+/** Reads the phone auth token. Not part of readEnv(): unset ANTITHEFT_TOKEN must not break other routes. */
+export function readAntitheftToken(): string {
+  const token = process.env.ANTITHEFT_TOKEN
+  if (!token || token.trim() === '') {
+    throw new ConfigError('ANTITHEFT_TOKEN', 'missing required env var ANTITHEFT_TOKEN')
+  }
+  if (token.length < 32) {
+    throw new ConfigError('ANTITHEFT_TOKEN', 'ANTITHEFT_TOKEN must be at least 32 characters')
+  }
+  return token
 }

@@ -36,13 +36,20 @@ export function parseRange(url: URL, options: RangeOptions): RangeResult {
 
 export type StringResult = { ok: true; value: string } | { ok: false; message: string }
 
+/** Validates a device string: 1..64 chars, no control characters. Shared by query and body parsing. */
+export function validateDevice(raw: unknown): raw is string {
+  if (typeof raw !== 'string') return false
+  if (raw.length === 0 || raw.length > 64) return false
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return false
+  return true
+}
+
 /** Validates an optional ?device= param: <=64 chars, no control characters. */
 export function parseDevice(url: URL): { ok: true; value: string | null } | { ok: false; message: string } {
   const raw = url.searchParams.get('device')
   if (raw === null) return { ok: true, value: null }
-  if (raw.length === 0 || raw.length > 64) return { ok: false, message: 'invalid "device"' }
-  // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(raw)) return { ok: false, message: 'invalid "device"' }
+  if (!validateDevice(raw)) return { ok: false, message: 'invalid "device"' }
   return { ok: true, value: raw }
 }
 

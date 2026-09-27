@@ -25,3 +25,7 @@ export function getCollection(env: Env): Collection<Document> {
 export function getRoutesView(env: Env): Collection<Document> {
   return getClient(env).db(env.mongodbDb).collection(env.mongodbRoutesView)
 }
+
+export function getModesCollection(env: Env): Collection<Document> {
+  return getClient(env).db(env.mongodbDb).collection(env.mongodbModesCollection)
+}

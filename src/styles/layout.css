@@ -213,6 +213,86 @@
   margin: 0;
 }
 
+.status-pill--danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+/* ---------- Mode card ---------- */
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-card h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mode-card-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mode-card-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.mode-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.mode-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.mode-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mode-device {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.mode-row-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.mode-button {
+  flex: none;
+  width: 100%;
+}
+
+.mode-button--danger {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--hairline));
+  color: var(--danger);
+}
+
 /* ---------- Range control ---------- */
 
 .range-control {
