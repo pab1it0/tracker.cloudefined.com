@@ -2,7 +2,8 @@
 
 A private web app that shows where an iPhone is right now and replays its routes on a map.
 It reads location points written once a minute (while armed) by an n8n anti-theft workflow into
-MongoDB. Login required; nothing is readable without a session.
+MongoDB. It also arms/disarms anti-theft mode per device. Login required; nothing is readable
+without a session.
 
 See the full design spec: [`docs/superpowers/specs/2026-09-27-tracker-design.md`](docs/superpowers/specs/2026-09-27-tracker-design.md).
 
@@ -13,10 +14,13 @@ Browser (React + MapLibre)
   └─ /api/*  (Vercel Functions, Web Request→Response; same handlers mounted by a Vite
     plugin locally)
         ├─ auth: POST /api/login, POST /api/logout, GET /api/session
+        ├─ phone: POST /api/mode (X-AntiTheft-Token header, no cookie)
         └─ data: GET /api/latest | /api/sessions | /api/points   (cookie required)
-              └─ mongodb driver, dedicated find-only user "antitheft_webapp"
+              GET|POST /api/modes (cookie)
+              └─ mongodb driver, dedicated user "antitheft_webapp"
                     ├─ /api/sessions → view n8n.antitheft_routes
-                    └─ /api/latest, /api/points → n8n.antitheft_locations
+                    ├─ /api/latest, /api/points → n8n.antitheft_locations
+                    └─ /api/mode, /api/modes → n8n.antitheft_modes
 ```
 
 `api/*.ts` files export Web-standard `GET`/`POST` handlers (`Request` → `Response`). On Vercel
@@ -58,7 +62,9 @@ make outbound HTTPS calls (the seed script calls OSRM):
 
 1. Import the GitHub repo `pab1it0/tracker.cloudefined.com` into Vercel.
 2. Set environment variables: `MONGODB_URI`, `MONGODB_DB`, `MONGODB_COLLECTION`,
-   `MONGODB_ROUTES_VIEW`, `TRACKER_PASSWORD`, `SESSION_SECRET`.
+   `MONGODB_ROUTES_VIEW`, `TRACKER_PASSWORD`, `SESSION_SECRET`, `ANTITHEFT_TOKEN` (same value as
+   the phone's `X-AntiTheft-Token`, at least 32 chars), and optionally `MONGODB_MODES_COLLECTION`
+   (default `antitheft_modes`).
 3. Custom domain: add `tracker.cloudefined.com`, then in Cloudflare DNS create a `CNAME` to
    `cname.vercel-dns.com` with the proxy **off** (grey cloud) so Vercel can issue and manage TLS.
 
@@ -78,15 +84,21 @@ referrer/content-type policy).
 4. The connection string must include `authSource=admin`.
 5. Recommended index: `{ device: 1, ts: -1 }` on `antitheft_locations`. Queries work without it,
    but it keeps `/api/latest` (per-device grouping) and `/api/points` fast as the collection
-   grows. The app user is read-only, so this index has to be created separately in Atlas.
+   grows. This index has to be created separately in Atlas.
+6. Create the collection `n8n.antitheft_modes` first (the role below has no `createCollection`).
+   Doc shape: `{ _id: device, device, mode: 'armed'|'disarmed', changed_at, last_checked_at }`.
+   Anything other than `'armed'` reads as disarmed. A device appears after its first phone
+   check-in, which creates it disarmed; arming an unknown device is a 404, by design.
+7. Create a custom role `antitheftModeWriter`: `find`/`insert`/`update` on `n8n.antitheft_modes`,
+   granted to `antitheft_webapp` alongside `antitheftReader`.
 
 ### Network access trade-off
 
 Vercel Hobby functions have dynamic (non-static) egress IPs, so Atlas's network access list must
 allow `0.0.0.0/0` in production. This is mitigated by the app connecting only as the
-least-privilege, read-only `antitheft_webapp` user with a long random password — a leaked
-connection string cannot write or read outside its two allowed namespaces. Vercel Static IPs
-(Pro plan) would remove the need for `0.0.0.0/0` entirely.
+least-privilege `antitheft_webapp` user with a long random password — a leaked connection string
+can only read its two read-only namespaces and write `antitheft_modes` (no delete). Vercel Static
+IPs (Pro plan) would remove the need for `0.0.0.0/0` entirely.
 
 ## Security notes
 
@@ -100,6 +112,9 @@ connection string cannot write or read outside its two allowed namespaces. Verce
   and `lib/server/**`.
 - Every API response sets `Cache-Control: no-store`; errors are JSON `{error}` with no stack
   traces leaked to the client.
+- The phone's `X-AntiTheft-Token` is compared in constant time; failures are rate-limited per IP
+  (5 / 10 min, a separate bucket from login) and the token is sent as a header, never in the URL.
+- Arm/disarm (`/api/modes`) is cookie-only, `SameSite=Strict`.
 
 ## Scripts
 

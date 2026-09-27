@@ -14,7 +14,7 @@ the **Location Ingest** workflow upserts one point per minute into MongoDB Atlas
 - **The app queries MongoDB directly as the dedicated read-only user `antitheft_webapp`**
   (custom role `antitheftReader`: `find` on `n8n.antitheft_locations` and the view `n8n.antitheft_routes`).
   Not the n8n credential, not the phone's webhook token.
-- Read-only. Arming/disarming stays in the n8n form.
+- Read-only for location data; arm/disarm moved into Tracker, see the addendum below.
 - Runs locally (`npm run dev`) and on Vercel (Hobby) with the same code.
 
 ## Data
@@ -101,4 +101,14 @@ Full-bleed MapLibre map (OpenFreeMap `dark` / `positron` by theme) with a floati
 - Browser verification with Chrome DevTools at desktop and 390 px widths, light and dark.
 
 ## Out of scope
-Arm/disarm, photos (not stored), write access, multi-user accounts.
+Photos (not stored), multi-user accounts.
+
+## 2026-09-27 addendum: arm/disarm moved into Tracker
+Arm/disarm moved out of the n8n form and into Tracker, backed by `n8n.antitheft_modes`
+(`{ _id: device, device, mode, changed_at, last_checked_at }`; anything other than `'armed'`
+reads as disarmed — fail closed).
+- `POST /api/mode` — phone check-in, `X-AntiTheft-Token` header, no cookie. Creates the device
+  disarmed on first check-in; arming an unknown device is a 404.
+- `GET|POST /api/modes` — cookie-only, used by the Tracker UI to view/change mode.
+- New role `antitheftModeWriter` (`find`/`insert`/`update` on `antitheft_modes`, no delete),
+  granted to `antitheft_webapp` alongside `antitheftReader`.
