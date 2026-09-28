@@ -1,12 +1,16 @@
 // Self-contained local dev seeder: (re)creates the antitheft_locations collection
-// (validator + indexes), the antitheft_routes view, the antitheft_modes collection,
-// the least-privilege roles/user, and synthetic route data for device "Demo iPhone".
+// (validator + indexes), the antitheft_routes view, the antitheft_modes and
+// antitheft_photos collections, the least-privilege roles/user, and synthetic
+// route + photo data for device "Demo iPhone".
 // Reads/writes .env.local itself. Runnable directly by Node's built-in TypeScript
-// type stripping: erasable syntax only.
+// type stripping: erasable syntax only. Photo doc shape is duplicated from
+// lib/server/photos.ts (storePhoto) rather than imported, to keep this script's
+// own extensionless cross-imports working under type stripping.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { randomBytes, randomInt } from 'node:crypto'
-import { MongoClient } from 'mongodb'
+import { MongoClient, Binary } from 'mongodb'
+import sharp from 'sharp'
 
 const ENV_PATH = new URL('../.env.local', import.meta.url)
 const DB_NAME = 'n8n'
@@ -14,9 +18,11 @@ const COLLECTION_NAME = 'antitheft_locations'
 const VIEW_NAME = 'antitheft_routes'
 const ROLE_NAME = 'antitheftReader'
 const MODES_COLLECTION_NAME = 'antitheft_modes'
+const PHOTOS_COLLECTION_NAME = 'antitheft_photos'
 const MODES_ROLE_NAME = 'antitheftModeWriter'
 const APP_USER = 'antitheft_webapp'
 const DEVICE = 'Demo iPhone'
+const HOME_RADIUS_M = 200
 
 interface LonLat {
   0: number
@@ -262,6 +268,36 @@ function buildNullSessionPoints(day: Date): SeedPoint[] {
   return points
 }
 
+const DEMO_PHOTO_COLORS: [number, number, number][] = [
+  [200, 60, 60],
+  [60, 140, 200],
+  [80, 170, 90],
+  [190, 150, 40],
+]
+
+/** Builds one solid-colour demo photo (with a big number overlay), full + thumbnail, JPEG-encoded. */
+async function buildDemoPhoto(
+  n: number,
+): Promise<{ full: Buffer; thumb: Buffer; width: number; height: number }> {
+  const [r, g, b] = DEMO_PHOTO_COLORS[(n - 1) % DEMO_PHOTO_COLORS.length]!
+  const svg = Buffer.from(
+    `<svg width="1280" height="960"><text x="640" y="540" font-size="360" font-family="sans-serif" ` +
+      `fill="white" text-anchor="middle">${n}</text></svg>`,
+  )
+  const baseBuf = await sharp({ create: { width: 1280, height: 960, channels: 3, background: { r, g, b } } })
+    .composite([{ input: svg }])
+    .jpeg({ quality: 90 })
+    .toBuffer()
+
+  const { data: full, info } = await sharp(baseBuf)
+    .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 75 })
+    .toBuffer({ resolveWithObject: true })
+  const thumb = await sharp(baseBuf).resize(160, 160, { fit: 'cover' }).jpeg({ quality: 70 }).toBuffer()
+
+  return { full, thumb, width: info.width, height: info.height }
+}
+
 async function main(): Promise<void> {
   const env = parseEnvFile(ENV_PATH)
   const adminUri = env.MONGODB_ADMIN_URI
@@ -363,13 +399,20 @@ async function main(): Promise<void> {
       device: string
       mode: string
       changed_at: Date | null
+      changed_by: string | null
       last_checked_at: Date | null
     }>(MODES_COLLECTION_NAME)
     await modesCol.updateOne(
       { _id: DEVICE },
-      { $set: { device: DEVICE, mode: 'armed', changed_at: new Date(), last_checked_at: null } },
+      { $set: { device: DEVICE, mode: 'armed', changed_at: new Date(), changed_by: 'web', last_checked_at: null } },
       { upsert: true },
     )
+
+    console.log(`Recreating collection ${DB_NAME}.${PHOTOS_COLLECTION_NAME}...`)
+    const photosCollections = await db.listCollections({ name: PHOTOS_COLLECTION_NAME }).toArray()
+    if (photosCollections.length > 0) await db.dropCollection(PHOTOS_COLLECTION_NAME)
+    await db.createCollection(PHOTOS_COLLECTION_NAME)
+    const photosCol = db.collection<{ _id: string }>(PHOTOS_COLLECTION_NAME)
 
     console.log(`Recreating role ${ROLE_NAME} and user ${APP_USER}...`)
     try {
@@ -399,6 +442,8 @@ async function main(): Promise<void> {
       createRole: MODES_ROLE_NAME,
       privileges: [
         { resource: { db: DB_NAME, collection: MODES_COLLECTION_NAME }, actions: ['find', 'insert', 'update'] },
+        { resource: { db: DB_NAME, collection: COLLECTION_NAME }, actions: ['insert', 'update'] },
+        { resource: { db: DB_NAME, collection: PHOTOS_COLLECTION_NAME }, actions: ['find', 'insert', 'update'] },
       ],
       roles: [],
     })
@@ -424,11 +469,24 @@ async function main(): Promise<void> {
         MONGODB_COLLECTION: COLLECTION_NAME,
         MONGODB_ROUTES_VIEW: VIEW_NAME,
         MONGODB_MODES_COLLECTION: MODES_COLLECTION_NAME,
+        MONGODB_PHOTOS_COLLECTION: PHOTOS_COLLECTION_NAME,
         TRACKER_PASSWORD: trackerPassword,
         SESSION_SECRET: sessionSecret,
         ANTITHEFT_TOKEN: antitheftToken,
       },
       ['TRACKER_PASSWORD', 'SESSION_SECRET', 'ANTITHEFT_TOKEN'],
+    )
+
+    // Demo route's start point (Jaffa Port), only written if absent so it doesn't clobber a real config.
+    upsertEnvKeys(
+      ENV_PATH,
+      {
+        HOME_LAT: String(LANDMARKS.JAFFA_PORT![1]),
+        HOME_LON: String(LANDMARKS.JAFFA_PORT![0]),
+        HOME_RADIUS_M: String(HOME_RADIUS_M),
+        KNOWN_WIFI: 'DemoHomeWiFi',
+      },
+      ['HOME_LAT', 'HOME_LON', 'HOME_RADIUS_M', 'KNOWN_WIFI'],
     )
 
     console.log('Generating synthetic routes for device "Demo iPhone"...')
@@ -491,6 +549,39 @@ async function main(): Promise<void> {
       `Seeded ${allPoints.length} points across ${historicalPlans.length + 1} sessions ` +
         `(+ ${nullPoints.length} null-session points) for device "${DEVICE}".`,
     )
+
+    console.log('Generating demo photos...')
+    await photosCol.deleteMany({ device: DEVICE })
+    const photoSourcePoints = allPoints.filter((p) => p.session !== null)
+    const photoCount = 4
+    for (let i = 0; i < photoCount; i++) {
+      const point = photoSourcePoints[Math.floor((i / photoCount) * photoSourcePoints.length)]!
+      const camera = i % 2 === 0 ? 'front' : 'back'
+      const { full, thumb, width, height } = await buildDemoPhoto(i + 1)
+      const id = `${DEVICE}|${point.ts.toISOString()}|${camera}`
+      await photosCol.updateOne(
+        { _id: id },
+        {
+          $set: {
+            _id: id,
+            device: DEVICE,
+            camera,
+            trigger: 'heartbeat',
+            ts: point.ts,
+            received_at: point.received_at,
+            loc: point.loc,
+            mime: 'image/jpeg',
+            bytes: new Binary(full),
+            thumb: new Binary(thumb),
+            width,
+            height,
+            size: full.length,
+          },
+        },
+        { upsert: true },
+      )
+    }
+    console.log(`Seeded ${photoCount} demo photos for device "${DEVICE}".`)
     console.log('Secrets written to .env.local (not printed here).')
   } finally {
     await client.close()

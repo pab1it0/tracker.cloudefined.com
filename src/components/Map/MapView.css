@@ -77,3 +77,27 @@
     opacity: 0;
   }
 }
+
+.photo-marker {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.maplibregl-marker:has(.latest-marker) {
+  z-index: 6;
+}
+
+.photo-marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

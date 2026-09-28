@@ -4,6 +4,7 @@ import type {
   DeviceMode,
   LatestResponse,
   ModesResponse,
+  PhotosResponse,
   PointsResponse,
   SessionsResponse,
 } from '../../lib/shared/types.js'
@@ -103,4 +104,17 @@ export function setMode(
     body: JSON.stringify({ device, mode }),
     signal,
   })
+}
+
+export function getPhotos(
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+): Promise<PhotosResponse> {
+  const params = new URLSearchParams({ from, to })
+  return request(`/api/photos?${params}`, { signal })
+}
+
+export function photoUrl(id: string, size: 'thumb' | 'full'): string {
+  return `/api/photo?id=${encodeURIComponent(id)}&size=${size}`
 }

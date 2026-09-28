@@ -128,7 +128,11 @@ function ModeRow({ device, pending, error, onToggle, showName }: ModeRowProps) {
     confirmTimer.current = setTimeout(() => setConfirming(false), CONFIRM_MS)
   }
 
-  const sinceLabel = device.since ? `since ${formatRelative(device.since)}` : 'never changed'
+  const sinceLabel = device.since
+    ? device.changedBy === 'airplane' || device.changedBy === 'charger'
+      ? `armed by ${device.changedBy} · ${formatRelative(device.since)}`
+      : `since ${formatRelative(device.since)}`
+    : 'never changed'
   const checkedLabel = device.lastCheckedAt
     ? `phone checked ${formatRelative(device.lastCheckedAt)}`
     : 'phone never checked'

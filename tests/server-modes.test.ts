@@ -47,7 +47,10 @@ describe('checkIn', () => {
 
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { _id: 'TestPhone' },
-      { $set: { last_checked_at: now }, $setOnInsert: { device: 'TestPhone', mode: 'disarmed', changed_at: null } },
+      {
+        $set: { last_checked_at: now },
+        $setOnInsert: { device: 'TestPhone', mode: 'disarmed', changed_at: null, changed_by: null },
+      },
       { upsert: true, returnDocument: 'after' },
     )
     expect(result.device).toBe('TestPhone')

@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const API_NAME_RE = /^[a-z][a-z-]{0,30}$/
-const MAX_BODY_BYTES = 1024 * 1024
+const MAX_BODY_BYTES = 5 * 1024 * 1024
 
 const SERVER_ENV_KEYS = [
   'MONGODB_URI',
@@ -14,9 +14,14 @@ const SERVER_ENV_KEYS = [
   'MONGODB_COLLECTION',
   'MONGODB_ROUTES_VIEW',
   'MONGODB_MODES_COLLECTION',
+  'MONGODB_PHOTOS_COLLECTION',
   'TRACKER_PASSWORD',
   'SESSION_SECRET',
   'ANTITHEFT_TOKEN',
+  'HOME_LAT',
+  'HOME_LON',
+  'HOME_RADIUS_M',
+  'KNOWN_WIFI',
 ] as const
 
 function readBody(req: IncomingMessage): Promise<Buffer | undefined> {

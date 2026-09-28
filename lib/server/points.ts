@@ -126,3 +126,72 @@ export async function pointsInRange(
   return { points, truncated }
 }
 
+export interface NewPoint {
+  device: string
+  session: string | null
+  ts: Date
+  accuracyM: number | null
+  altitudeM: number | null
+  speedMps: number | null
+  battery: number | null
+  lat: number
+  lon: number
+}
+
+/** Upserts a location point, keyed by `${device}|${ts.toISOString()}` (matches the doc shape n8n used to write). */
+export async function upsertPoint(col: Collection<Document>, point: NewPoint, now: Date): Promise<string> {
+  const pointId = `${point.device}|${point.ts.toISOString()}`
+  const doc = {
+    point_id: pointId,
+    device: point.device,
+    session: point.session,
+    ts: point.ts,
+    received_at: now,
+    loc: { type: 'Point' as const, coordinates: [point.lon, point.lat] },
+    accuracy_m: point.accuracyM,
+    altitude_m: point.altitudeM,
+    speed_mps: point.speedMps,
+    battery: point.battery,
+  }
+  await col.updateOne({ point_id: pointId }, { $set: doc }, { upsert: true })
+  return pointId
+}
+
+export interface PointLoc {
+  type: 'Point'
+  coordinates: [number, number]
+}
+
+/** Nearest point for a device within windowMs of ts (either direction); returns its loc, or null if none. */
+export async function nearestPoint(
+  col: Collection<Document>,
+  device: string,
+  ts: Date,
+  windowMs: number,
+): Promise<PointLoc | null> {
+  const from = new Date(ts.getTime() - windowMs)
+  const to = new Date(ts.getTime() + windowMs)
+  const docs = await col
+    .find({ device, ts: { $gte: from, $lte: to } }, { projection: { _id: 0, ts: 1, loc: 1 } })
+    .toArray()
+  if (docs.length === 0) return null
+
+  let best: Document | null = null
+  let bestDiff = Infinity
+  for (const doc of docs) {
+    const docTs = doc.ts instanceof Date ? doc.ts.getTime() : NaN
+    if (Number.isNaN(docTs)) continue
+    const diff = Math.abs(docTs - ts.getTime())
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = doc
+    }
+  }
+  if (!best) return null
+  const loc = best.loc as { type?: unknown; coordinates?: unknown } | undefined
+  if (!loc || loc.type !== 'Point' || !Array.isArray(loc.coordinates) || loc.coordinates.length !== 2) return null
+  const [lon, lat] = loc.coordinates as [unknown, unknown]
+  if (typeof lon !== 'number' || typeof lat !== 'number') return null
+  return { type: 'Point', coordinates: [lon, lat] }
+}
+

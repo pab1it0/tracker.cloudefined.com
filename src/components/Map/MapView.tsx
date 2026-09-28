@@ -20,6 +20,9 @@ import {
   updateRoute,
 } from '../../lib/mapData.js'
 import { usePrefersReducedMotion } from '../../hooks/useMediaQuery.js'
+import { photoUrl } from '../../lib/api.js'
+import { formatAbsolute } from '../../lib/format.js'
+import type { PhotoGroup } from '../../lib/photoGroups.js'
 import { HoverTooltip, type HoverInfo } from './HoverTooltip.js'
 
 export interface MapViewHandle {
@@ -43,6 +46,8 @@ interface MapViewProps {
   fitBbox: [number, number, number, number] | null
   fitPadding: PaddingBox
   fitToken: number
+  photos: PhotoGroup[]
+  onPhotoClick: (photo: PhotoGroup) => void
   onMapReady?: (handle: MapViewHandle) => void
 }
 
@@ -55,6 +60,8 @@ export function MapView({
   fitBbox,
   fitPadding,
   fitToken,
+  photos,
+  onPhotoClick,
   onMapReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -75,6 +82,9 @@ export function MapView({
   headPositionRef.current = headPosition
   const latestRef = useRef<LatestPoint | null>(latest)
   latestRef.current = latest
+  const photoMarkersRef = useRef<Map<string, Marker>>(new Map())
+  const onPhotoClickRef = useRef(onPhotoClick)
+  onPhotoClickRef.current = onPhotoClick
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -139,6 +149,8 @@ export function MapView({
     return () => {
       latestMarkerRef.current?.remove()
       latestMarkerRef.current = null
+      for (const marker of photoMarkersRef.current.values()) marker.remove()
+      photoMarkersRef.current.clear()
       map.remove()
       mapRef.current = null
     }
@@ -201,6 +213,48 @@ export function MapView({
       latestMarkerRef.current.setLngLat([latest.lon, latest.lat])
     }
   }, [latest, reducedMotion, ready])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const markers = photoMarkersRef.current
+    const seen = new Set<string>()
+
+    for (const photo of photos) {
+      if (photo.lat === null || photo.lon === null) continue
+      seen.add(photo.key)
+      const shown = photo.front ?? photo.back
+      if (!shown) continue
+      let marker = markers.get(photo.key)
+      if (!marker) {
+        const el = document.createElement('button')
+        el.type = 'button'
+        el.className = 'photo-marker'
+        el.setAttribute('aria-label', `Photo at ${formatAbsolute(photo.t)}`)
+        const img = document.createElement('img')
+        img.src = photoUrl(shown.id, 'thumb')
+        img.alt = `Photo at ${formatAbsolute(photo.t)}`
+        img.loading = 'lazy'
+        img.decoding = 'async'
+        el.appendChild(img)
+        el.addEventListener('click', (e) => {
+          e.stopPropagation()
+          onPhotoClickRef.current(photo)
+        })
+        marker = new Marker({ element: el }).setLngLat([photo.lon, photo.lat]).addTo(map)
+        markers.set(photo.key, marker)
+      } else {
+        marker.setLngLat([photo.lon, photo.lat])
+      }
+    }
+
+    for (const [key, marker] of markers) {
+      if (!seen.has(key)) {
+        marker.remove()
+        markers.delete(key)
+      }
+    }
+  }, [photos, ready])
 
   useEffect(() => {
     const map = mapRef.current
